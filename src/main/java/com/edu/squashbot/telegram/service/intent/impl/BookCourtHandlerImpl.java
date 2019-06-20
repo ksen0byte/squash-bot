@@ -1,10 +1,12 @@
 package com.edu.squashbot.telegram.service.intent.impl;
 
+import com.edu.squashbot.telegram.config.DialogFlowConfig;
 import com.edu.squashbot.telegram.dialogflow.DialogFlowService;
 import com.edu.squashbot.telegram.dialogflow.IntentName;
 import com.edu.squashbot.telegram.entity.CourtBooking;
 import com.edu.squashbot.telegram.service.BookingService;
 import com.edu.squashbot.telegram.service.CallbackHandler;
+import com.edu.squashbot.telegram.service.I18nService;
 import com.edu.squashbot.telegram.service.UserService;
 import com.edu.squashbot.telegram.service.intent.BaseMessageHandler;
 import com.google.api.services.dialogflow.v2beta1.model.GoogleCloudDialogflowV2beta1QueryResult;
@@ -17,9 +19,11 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,7 +34,7 @@ import static java.util.stream.Collectors.toMap;
 @Service
 @Slf4j
 public class BookCourtHandlerImpl extends BaseMessageHandler implements CallbackHandler {
-    private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm, MMM dd");
+    private DateTimeFormatter dateTimeFormatter;
 
     @Autowired
     private DialogFlowService dialogFlowService;
@@ -38,6 +42,16 @@ public class BookCourtHandlerImpl extends BaseMessageHandler implements Callback
     private BookingService bookingService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private DialogFlowConfig config;
+    @Autowired
+    private I18nService i18nService;
+
+    @PostConstruct
+    public void init() {
+        dateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm, MMM dd")
+                .localizedBy(Locale.forLanguageTag(config.getDefaultLanguage()));
+    }
 
     @Override
     public BotApiMethod<Message> handleMessage(Message message, GoogleCloudDialogflowV2beta1QueryResult response) {
@@ -69,7 +83,7 @@ public class BookCourtHandlerImpl extends BaseMessageHandler implements Callback
                 .map(courtBooking -> this.getSuccessBookingResponse(response.getFulfillmentText(), courtBooking, actualDateTime))
                 .orElseGet(() -> {
                     var courtIsNotAvailableResponse = dialogFlowService.getResponse(telegramUser.getId().toString(),
-                            "Sorry, " + telegramUser.getFirstName() + ", the court is not available.");
+                            i18nService.getMessage("court.notAvailable", telegramUser.getFirstName()));
                     return courtIsNotAvailableResponse.getFulfillmentText();
                 });
     }
@@ -98,7 +112,7 @@ public class BookCourtHandlerImpl extends BaseMessageHandler implements Callback
         if (!idToBookingDateMap.isEmpty()) {
             return getKeyboardMessage(message, response.getFulfillmentText(), idToBookingDateMap);
         } else {
-            return createMessage(message.getChatId(), "You don't have any bookings!");
+            return createMessage(message.getChatId(), i18nService.getMessage("court.noBookings"));
         }
     }
 
@@ -109,7 +123,7 @@ public class BookCourtHandlerImpl extends BaseMessageHandler implements Callback
             var courtBookingId = payload.replace("CourtBookingId:", "");
             bookingService.removeBooking(courtBookingId);
             return createMessage(callbackQuery.getMessage().getChatId(),
-                    "Okay, done! You can always /bookings to view all your bookings");
+                    i18nService.getMessage("court.booking.success"));
         }
         throw new RuntimeException("Wtf button");
     }

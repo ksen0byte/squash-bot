@@ -10,9 +10,5 @@ import java.util.List;
 
 @Repository
 public interface CourtRepository extends MongoRepository<Court, String> {
-//    @Query(value = "{$or: [{bookings: {$not : {$elemMatch: {start: {$lte: ?0}, finish:{$gt: ?0}}}}}, {bookings: { $size: 0 }}]}")
-//    Slice<Court> findAvailableCourtsForTime(LocalDateTime time, Pageable pageable);
-
     Slice<Court> findAllByIdNotIn(List<String> ids, Pageable pageable);
-
 }
